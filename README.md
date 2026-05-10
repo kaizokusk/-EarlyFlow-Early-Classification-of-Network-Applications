@@ -40,7 +40,7 @@ This project implements CALIMERA, a state-of-the-art ETSC method, and extends it
 
 ## 2. Dataset
 
-**Source:** Campus Network data.
+**Source:** Mobile YouTube network captures, processed into per-packet CSVs.
 
 **Input files:** `early_ml/split_file/*_filtered.csv` — four files, one per traffic category.
 
@@ -50,7 +50,7 @@ This project implements CALIMERA, a state-of-the-art ETSC method, and extends it
 |-------|-------|-------------|
 | 0 | `cloud` | Cloud service traffic |
 | 1 | `social_media` | Social media platform traffic |
-| 2 | `streaming` |  streaming  |
+| 2 | `streaming` | Video/audio streaming (YouTube etc.) |
 | 3 | `web` | General web browsing |
 
 ### Per-Packet Features
