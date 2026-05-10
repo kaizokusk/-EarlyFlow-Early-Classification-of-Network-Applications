@@ -17,7 +17,7 @@ Early classification of mobile network flows using per-packet features. The syst
 9. [Phase 6 — Report Generation](#9-phase-6--report-generation)
 10. [Phase 6b — F1 / Precision / Recall Analysis](#10-phase-6b--f1--precision--recall-analysis)
 11. [Deep Model Extension (EarlyFlow)](#11-deep-model-extension-earlyflow)
-12. [Results](#12-results)
+
 13. [How to Run](#13-how-to-run)
 14. [Dependencies](#14-dependencies)
 15. [Key Design Decisions](#15-key-design-decisions)
@@ -533,45 +533,7 @@ Produces `compare_table.csv` and `compare_plot.png` — grouped bar chart of acc
 
 ---
 
-## 12. Results
 
-### MiniRocket + CALIMERA (Phase 3 baseline, α=0.5)
-
-| Metric | Value |
-|--------|-------|
-| Val accuracy | **84.85%** |
-| Earliness | **0.167** (sees only 16.7% of each flow on average) |
-| Harmonic Mean (HM) | **0.841** |
-| Baseline accuracy (full flow, t=20) | 82.51% |
-
-> CALIMERA at α=0.5 **exceeds** full-flow baseline accuracy (+2.3%) while making decisions after seeing only 3.3 out of 20 packets on average.
-
-### Alpha Sweep (MiniRocket, val set)
-
-| α | Accuracy | Earliness | HM | Notes |
-|---|----------|-----------|----|-------|
-| 0.001 | 0.664 | 0.050 | 0.782 | Classifies at packet 1 (extreme early) |
-| 0.1 | 0.664 | 0.050 | 0.782 | Still too aggressive |
-| 0.2 | 0.687 | 0.057 | 0.795 | Starts adapting |
-| 0.3 | 0.788 | 0.100 | 0.840 | Good balance |
-| **0.5** | **0.848** | **0.167** | **0.841** | **Best HM** |
-| 0.7 | 0.863 | 0.272 | 0.790 | High accuracy, later decisions |
-| 0.9 | 0.859 | 0.361 | 0.733 | Near-baseline behaviour |
-| Baseline | 0.825 | 1.000 | 0.825 | All 20 packets |
-
-### Per-Timestamp Accuracy (MiniRocket classifiers)
-
-| Packets seen (t) | Val Accuracy |
-|-----------------|-------------|
-| 1 | 66.4% |
-| 2 | 73.1% |
-| 3 | 77.8% |
-| 4 | 79.8% |
-| 5 | 80.3% |
-| 10 | 80.2% |
-| 20 (baseline) | **82.5%** |
-
-Most accuracy is gained in the first 5 packets. After packet 5, improvement is marginal — which is why CALIMERA can trigger early and still be competitive.
 
 ---
 
