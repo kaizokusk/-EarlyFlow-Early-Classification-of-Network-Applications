@@ -3,9 +3,9 @@
 Triggered F1 evaluation for ALL models
 =======================================
 For each model (MiniRocket, LSTM, GRU, Transformer, TCN):
-  1. Build test and trigger-set probas at every t
+  1. Build val and trigger-set probas at every t
   2. Fit CALIMERA trigger on the trigger set
-  3. Simulate online trigger on test set
+  3. Simulate online trigger on val set
   4. Compute classification_report on triggered predictions only
 
 Outputs -> calimera/eval/
@@ -77,7 +77,7 @@ def build_probas_deep(cal, X_np, T_MAX, n_classes):
     return probas
 
 
-def simulate_trigger(trig_probas, test_probas, y_trig, y_test, timestamps, T_MAX, n_classes):
+def simulate_trigger(trig_probas, val_probas, y_trig, y_val, timestamps, T_MAX, n_classes):
     cost_matrices = CostMatrices(
         timestamps=timestamps, n_classes=n_classes, alpha=BEST_ALPHA,
         delay_cost=lambda t, a=BEST_ALPHA: (1.0 - a) * float(t) / float(T_MAX),
@@ -86,13 +86,13 @@ def simulate_trigger(trig_probas, test_probas, y_trig, y_test, timestamps, T_MAX
     trigger = CALIMERA(timestamps=timestamps)
     trigger.fit(X_trig_dummy, trig_probas, y_trig, cost_matrices)
 
-    n = len(y_test)
+    n = len(y_val)
     all_preds  = np.full(n, -1, dtype=int)
     all_t_star = np.full(n, T_MAX, dtype=int)
     decided    = np.zeros(n, dtype=bool)
 
     for t_idx, t in enumerate(timestamps):
-        probas_t  = test_probas[:, t_idx, :]
+        probas_t  = val_probas[:, t_idx, :]
         cur_preds = probas_t.argmax(axis=1)
         if t == T_MAX:
             mask = ~decided
@@ -108,7 +108,7 @@ def simulate_trigger(trig_probas, test_probas, y_trig, y_test, timestamps, T_MAX
 
     still_open = ~decided
     if still_open.any():
-        all_preds[still_open]  = test_probas[still_open, -1, :].argmax(axis=1)
+        all_preds[still_open]  = val_probas[still_open, -1, :].argmax(axis=1)
         all_t_star[still_open] = T_MAX
 
     return all_preds, all_t_star
@@ -120,8 +120,8 @@ def main():
     EVAL_DIR.mkdir(parents=True, exist_ok=True)
 
     print("[0] Loading data …")
-    X_test  = np.load(DATA_DIR / "X_test.npy").astype(np.float32)
-    y_test  = np.load(DATA_DIR / "y_test.npy").astype(np.int32)
+    X_val   = np.load(DATA_DIR / "X_val.npy").astype(np.float32)
+    y_val   = np.load(DATA_DIR / "y_val.npy").astype(np.int32)
     X_train = np.load(DATA_DIR / "X_train.npy").astype(np.float32)
     y_train = np.load(DATA_DIR / "y_train.npy").astype(np.int32)
 
@@ -133,7 +133,7 @@ def main():
     T_MAX       = meta["T_MAX"]
     n_classes   = len(label_map)
     timestamps  = np.arange(1, T_MAX + 1)
-    print(f"  Test {len(X_test):,} | T_MAX={T_MAX} | classes={class_names}")
+    print(f"  Val {len(X_val):,} | T_MAX={T_MAX} | classes={class_names}")
 
     # Derive trigger set (same split as training)
     idx = np.arange(len(X_train))
@@ -160,8 +160,8 @@ def main():
 
             print("  Building trig probas …")
             trig_probas = build_probas_minirocket(rocket, classifiers, X_trig, T_MAX, n_classes)
-            print("  Building test probas …")
-            test_probas = build_probas_minirocket(rocket, classifiers, X_test, T_MAX, n_classes)
+            print("  Building val probas …")
+            val_probas  = build_probas_minirocket(rocket, classifiers, X_val,  T_MAX, n_classes)
             del rocket, classifiers
         else:
             model = get_model(model_name).to(cfg.DEVICE)
@@ -171,21 +171,21 @@ def main():
 
             print("  Building trig probas …")
             trig_probas = build_probas_deep(cal, X_trig, T_MAX, n_classes)
-            print("  Building test probas …")
-            test_probas = build_probas_deep(cal, X_test, T_MAX, n_classes)
+            print("  Building val probas …")
+            val_probas  = build_probas_deep(cal, X_val,  T_MAX, n_classes)
             del model, cal
         gc.collect()
 
-        print("  Fitting CALIMERA trigger & simulating on test set …")
+        print("  Fitting CALIMERA trigger & simulating on val set …")
         trig_preds, t_star = simulate_trigger(
-            trig_probas, test_probas, y_trig, y_test, timestamps, T_MAX, n_classes
+            trig_probas, val_probas, y_trig, y_val, timestamps, T_MAX, n_classes
         )
-        del trig_probas, test_probas; gc.collect()
+        del trig_probas, val_probas; gc.collect()
 
         avg_t_star = float(t_star.mean())
         earliness  = avg_t_star / T_MAX
-        macro_f1   = f1_score(y_test, trig_preds, average="macro", zero_division=0)
-        accuracy   = float((trig_preds == y_test).mean())
+        macro_f1   = f1_score(y_val, trig_preds, average="macro", zero_division=0)
+        accuracy   = float((trig_preds == y_val).mean())
 
         report_header = (
             f"Model: {model_name.upper()}   (alpha={BEST_ALPHA})\n"
@@ -196,7 +196,7 @@ def main():
             f"{'='*60}\n"
         )
         report_body = classification_report(
-            y_test, trig_preds, target_names=class_names, zero_division=0
+            y_val, trig_preds, target_names=class_names, zero_division=0
         )
         full_report = report_header + report_body
         all_reports.append(full_report)
@@ -222,7 +222,7 @@ def main():
         for r in summary_rows
     ]
     summary = (
-        f"\nCALIMERA-Triggered Classification Summary — TEST SET  (alpha={BEST_ALPHA})\n"
+        f"\nCALIMERA-Triggered Classification Summary  (alpha={BEST_ALPHA})\n"
         f"{'='*len(header)}\n"
         f"{header}\n{sep}\n"
         + "\n".join(rows)
